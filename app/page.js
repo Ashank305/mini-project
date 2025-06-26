@@ -96,7 +96,7 @@ export default function Home() {
                 type="number"
                 value={area}
                 onChange={(e) => setArea(e.target.value)}
-                placeholder="Enter area (e.g. 1200)"
+                placeholder="Enter area (e.g. 2500)"
               />
             </div>
 
