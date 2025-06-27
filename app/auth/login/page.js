@@ -65,15 +65,15 @@ export default function LoginPage() {
           Log In
         </button>
 
-        <p className="mt-4 text-center text-sm text-gray-600">
-          Don't have an account?{' '}
-          <span
-            onClick={() => router.push('/auth/signup')}
-            className="text-blue-700 font-medium cursor-pointer hover:underline"
-          >
-            Sign Up
-          </span>
-        </p>
+       <p className="mt-4 text-center text-sm text-gray-600">
+  Don&apos;t have an account?{' '}
+  <span
+    onClick={() => router.push('/auth/signup')}
+    className="text-blue-700 font-medium cursor-pointer hover:underline"
+  >
+    Sign Up
+  </span>
+</p>
       </form>
     </main>
   );
