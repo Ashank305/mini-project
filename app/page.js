@@ -1,9 +1,11 @@
-// === app/page.js ===
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
+  const router = useRouter();
+  const [user, setUser] = useState(null);
   const [propertyRates, setPropertyRates] = useState([]);
   const [type, setType] = useState('');
   const [area, setArea] = useState('');
@@ -11,12 +13,19 @@ export default function Home() {
   const [amenities, setAmenities] = useState([]);
   const [price, setPrice] = useState(null);
 
+  // Load user from localStorage
+  useEffect(() => {
+    const savedUser = localStorage.getItem('loggedInUser');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+  }, []);
+
   useEffect(() => {
     async function fetchRates() {
       try {
         const res = await fetch('/api/rates');
         const data = await res.json();
-        console.log("Fetched rates:", data);
         setPropertyRates(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error('Error loading rates:', err);
@@ -62,12 +71,55 @@ export default function Home() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('loggedInUser');
+    setUser(null);
+    router.refresh(); // force refresh page state
+  };
+
   const uniqueCities = Array.isArray(propertyRates)
     ? [...new Set(propertyRates.map((r) => r.city).filter(Boolean))]
     : [];
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-white px-4 py-12">
+    <main className="min-h-screen relative bg-gradient-to-br from-gray-100 to-white px-4 py-12 flex items-center justify-center">
+      
+      {/* 🔐 Header Auth Buttons / User Info */}
+      <div className="absolute top-6 right-6 flex items-center gap-4">
+        {user ? (
+          <>
+            <span className="text-blue-900 font-medium">👋 {user.name}</span>
+            <img
+              src="user.png"
+              alt="User Icon"
+              className="w-10 h-10 rounded-full border border-gray-300"
+            />
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition"
+            >
+              Logout
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => router.push('/auth/login')}
+              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-xl shadow-sm hover:bg-gray-100 transition"
+            >
+              Log In
+            </button>
+            <button
+              onClick={() => router.push('/auth/signup')}
+              className="px-4 py-2 bg-blue-700 text-white rounded-xl shadow-sm hover:bg-blue-800 transition"
+            >
+              Sign Up
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* 🏠 Calculator UI */}
       <div className="w-full max-w-4xl bg-white/60 backdrop-blur-md p-10 rounded-3xl shadow-2xl border border-gray-200">
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-extrabold text-blue-900">🏠 Premium Property Price Estimator</h1>
