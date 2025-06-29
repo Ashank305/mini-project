@@ -13,7 +13,6 @@ export default function Home() {
   const [amenities, setAmenities] = useState([]);
   const [price, setPrice] = useState(null);
 
-  // Load user from localStorage
   useEffect(() => {
     const savedUser = localStorage.getItem('loggedInUser');
     if (savedUser) {
@@ -62,6 +61,46 @@ export default function Home() {
     setPrice(finalPrice);
   };
 
+  const saveProperty = async () => {
+    if (!user || !user.email) {
+      alert("Please log in to save properties.");
+      return;
+    }
+
+    if (!type || !area || !location || !price) {
+      alert("Please fill all fields and calculate the price before saving.");
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/properties/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          type,
+          area,
+          location,
+          amenities,
+          price,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Failed to save property.');
+        console.error('Save failed:', data);
+        return;
+      }
+
+      alert('✅ Property saved successfully!');
+    } catch (error) {
+      console.error('Error saving property:', error.message);
+      alert('⚠️ Something went wrong. Try again.');
+    }
+  };
+
   const handleAmenityChange = (e) => {
     const { value, checked } = e.target;
     if (checked) {
@@ -74,7 +113,7 @@ export default function Home() {
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');
     setUser(null);
-    router.refresh(); // force refresh page state
+    router.refresh();
   };
 
   const uniqueCities = Array.isArray(propertyRates)
@@ -83,14 +122,13 @@ export default function Home() {
 
   return (
     <main className="min-h-screen relative bg-gradient-to-br from-gray-100 to-white px-4 py-12 flex items-center justify-center">
-      
-      {/* 🔐 Header Auth Buttons / User Info */}
+      {/* 🔐 Header Buttons */}
       <div className="absolute top-6 right-6 flex items-center gap-4">
         {user ? (
           <>
             <span className="text-blue-900 font-medium">👋 {user.name}</span>
             <img
-              src="user.png"
+              src="/user.png"
               alt="User Icon"
               className="w-10 h-10 rounded-full border border-gray-300"
             />
@@ -119,7 +157,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* 🏠 Calculator UI */}
+      {/* 🏠 Property Calculator */}
       <div className="w-full max-w-4xl bg-white/60 backdrop-blur-md p-10 rounded-3xl shadow-2xl border border-gray-200">
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-extrabold text-blue-900">🏠 Premium Property Price Estimator</h1>
@@ -184,6 +222,15 @@ export default function Home() {
             >
               Calculate Price
             </button>
+
+            {price !== null && user && (
+              <button
+                onClick={saveProperty}
+                className="w-full mt-3 bg-emerald-600 text-white p-3 rounded-xl text-lg font-semibold hover:bg-emerald-700 transition"
+              >
+                Save Property
+              </button>
+            )}
           </div>
 
           <div className="flex flex-col items-center justify-center">
