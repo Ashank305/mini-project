@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [formData, setFormData] = useState({ email: '', password: '', otp: '', newPassword: '' });
   const [error, setError] = useState('');
+  const [showOtpFields, setShowOtpFields] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -22,8 +23,11 @@ export default function LoginPage() {
 
       if (!res.ok) {
         setError(data.error || 'Login failed');
+
+        if (data.requireOtp) {
+          setShowOtpFields(true); // Show OTP + new password fields
+        }
       } else {
-        // Save user session
         localStorage.setItem('loggedInUser', JSON.stringify({ name: data.name, email: formData.email }));
         router.push('/');
       }
@@ -56,24 +60,44 @@ export default function LoginPage() {
           className="w-full mb-6 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
         />
 
+        {showOtpFields && (
+          <>
+            <input
+              type="text"
+              placeholder="Enter OTP (1234)"
+              value={formData.otp}
+              onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
+              className="w-full mb-4 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400"
+            />
+
+            <input
+              type="password"
+              placeholder="New Password"
+              value={formData.newPassword}
+              onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+              className="w-full mb-6 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-400"
+            />
+          </>
+        )}
+
         {error && <p className="text-red-600 mb-4">{error}</p>}
 
         <button
           type="submit"
           className="w-full bg-blue-700 text-white p-3 rounded-xl text-lg font-semibold hover:bg-blue-800 transition"
         >
-          Log In
+          {showOtpFields ? 'Reset Password' : 'Log In'}
         </button>
 
-       <p className="mt-4 text-center text-sm text-gray-600">
-  Don&apos;t have an account?{' '}
-  <span
-    onClick={() => router.push('/auth/signup')}
-    className="text-blue-700 font-medium cursor-pointer hover:underline"
-  >
-    Sign Up
-  </span>
-</p>
+        <p className="mt-4 text-center text-sm text-gray-600">
+          Don&apos;t have an account?{' '}
+          <span
+            onClick={() => router.push('/auth/signup')}
+            className="text-blue-700 font-medium cursor-pointer hover:underline"
+          >
+            Sign Up
+          </span>
+        </p>
       </form>
     </main>
   );
