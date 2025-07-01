@@ -12,13 +12,28 @@ export default function Home() {
   const [location, setLocation] = useState('');
   const [amenities, setAmenities] = useState([]);
   const [price, setPrice] = useState(null);
+  const [savedResults, setSavedResults] = useState([]);
+  const [lastActivity, setLastActivity] = useState(Date.now());
 
   useEffect(() => {
     const savedUser = localStorage.getItem('loggedInUser');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+      fetchSavedResults(parsedUser.email);
     }
-  }, []);
+
+    const interval = setInterval(() => {
+      if (Date.now() - lastActivity > 5 * 60 * 1000) {
+        localStorage.removeItem('loggedInUser');
+        setUser(null);
+        setSavedResults([]);
+        router.refresh();
+      }
+    }, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [lastActivity]);
 
   useEffect(() => {
     async function fetchRates() {
@@ -31,23 +46,44 @@ export default function Home() {
         setPropertyRates([]);
       }
     }
-
     fetchRates();
+  }, []);
+
+  const fetchSavedResults = async (email) => {
+    try {
+      const res = await fetch('/api/properties/get', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (res.ok) setSavedResults(data.slice(0, 5));
+    } catch (error) {
+      console.error('Error fetching saved results:', error);
+    }
+  };
+
+  const handleUserActivity = () => setLastActivity(Date.now());
+
+  useEffect(() => {
+    window.addEventListener('mousemove', handleUserActivity);
+    window.addEventListener('keydown', handleUserActivity);
+    return () => {
+      window.removeEventListener('mousemove', handleUserActivity);
+      window.removeEventListener('keydown', handleUserActivity);
+    };
   }, []);
 
   const handleCalculate = () => {
     if (!type || !location || !area) return;
     const areaNum = parseFloat(area);
-
     const record = propertyRates.find(
       (r) => r.city === location && r.propertyType === type
     );
-
     if (!record) {
       alert('City or property type not found in database.');
       return;
     }
-
     const baseRate = record.rate;
     let amenityCost = 0;
     if (record.amenities) {
@@ -56,197 +92,146 @@ export default function Home() {
         if (cost) amenityCost += cost;
       });
     }
-
     const finalPrice = areaNum * baseRate + amenityCost;
     setPrice(finalPrice);
   };
 
   const saveProperty = async () => {
-    if (!user || !user.email) {
+    if (!user?.email) {
       alert("Please log in to save properties.");
       return;
     }
-
     if (!type || !area || !location || !price) {
       alert("Please fill all fields and calculate the price before saving.");
       return;
     }
-
     try {
       const res = await fetch('/api/properties/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: user.email,
-          type,
-          area,
-          location,
-          amenities,
-          price,
-        }),
+        body: JSON.stringify({ email: user.email, type, area, location, amenities, price }),
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.error || 'Failed to save property.');
-        console.error('Save failed:', data);
-        return;
-      }
-
+      if (!res.ok) throw new Error(data.error || 'Failed to save');
       alert('✅ Property saved successfully!');
+      fetchSavedResults(user.email);
     } catch (error) {
-      console.error('Error saving property:', error.message);
+      console.error(error);
       alert('⚠️ Something went wrong. Try again.');
     }
   };
 
-  const handleAmenityChange = (e) => {
-    const { value, checked } = e.target;
-    if (checked) {
-      setAmenities([...amenities, value]);
-    } else {
-      setAmenities(amenities.filter((a) => a !== value));
+  const deleteProperty = async (id) => {
+    try {
+      const res = await fetch('/api/properties/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+      alert('🗑️ Property deleted');
+      fetchSavedResults(user.email);
+    } catch (error) {
+      console.error(error);
+      alert('⚠️ Deletion failed');
     }
   };
 
+  const uniqueCities = [...new Set(propertyRates.map((r) => r.city).filter(Boolean))];
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');
     setUser(null);
+    setSavedResults([]);
     router.refresh();
   };
-
-  const uniqueCities = Array.isArray(propertyRates)
-    ? [...new Set(propertyRates.map((r) => r.city).filter(Boolean))]
-    : [];
+  const handleAmenityChange = (e) => {
+    const { value, checked } = e.target;
+    setAmenities(checked ? [...amenities, value] : amenities.filter((a) => a !== value));
+  };
 
   return (
-    <main className="min-h-screen relative bg-gradient-to-br from-gray-100 to-white px-4 py-12 flex items-center justify-center">
-      {/* 🔐 Header Buttons */}
-      <div className="absolute top-6 right-6 flex items-center gap-4">
+    <main className="min-h-screen p-6 md:px-10 md:py-12 bg-gray-100">
+      <div className="flex justify-between mb-6">
         {user ? (
-          <>
-            <span className="text-blue-900 font-medium">👋 {user.name}</span>
-            <img
-              src="/user.png"
-              alt="User Icon"
-              className="w-10 h-10 rounded-full border border-gray-300"
-            />
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition"
-            >
-              Logout
-            </button>
-          </>
+          <div className="flex items-center gap-4">
+            <span className="text-blue-900 font-semibold">👋 {user.name}</span>
+            <img src="/user.png" alt="User Icon" className="w-8 h-8 rounded-full" />
+            <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded-xl">Logout</button>
+          </div>
         ) : (
-          <>
-            <button
-              onClick={() => router.push('/auth/login')}
-              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-xl shadow-sm hover:bg-gray-100 transition"
-            >
-              Log In
-            </button>
-            <button
-              onClick={() => router.push('/auth/signup')}
-              className="px-4 py-2 bg-blue-700 text-white rounded-xl shadow-sm hover:bg-blue-800 transition"
-            >
-              Sign Up
-            </button>
-          </>
+          <div className="flex gap-2">
+            <button onClick={() => router.push('/auth/login')} className="bg-white border text-black px-4 py-2 rounded-xl">Login</button>
+            <button onClick={() => router.push('/auth/signup')} className="bg-blue-700 text-white px-4 py-2 rounded-xl">Sign Up</button>
+          </div>
         )}
       </div>
 
-      {/* 🏠 Property Calculator */}
-      <div className="w-full max-w-4xl bg-white/60 backdrop-blur-md p-10 rounded-3xl shadow-2xl border border-gray-200">
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-extrabold text-blue-900">🏠 Premium Property Price Estimator</h1>
-          <p className="text-gray-600 mt-2 text-lg">Get accurate real-estate pricing with real-world factors</p>
-        </div>
+      <div className="max-w-5xl mx-auto bg-white p-6 md:p-10 rounded-2xl shadow-xl">
+        <h1 className="text-3xl md:text-4xl font-bold text-center text-blue-900 mb-6">🏠 Premium Property Price Estimator</h1>
 
         <div className="grid md:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            <div>
-              <label className="block font-semibold text-gray-800 mb-1">Property Type</label>
-              <select
-                className="w-full border border-gray-300 p-3 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-blue-500"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value="">Select property type</option>
-                <option value="Apartment">Apartment</option>
-                <option value="Villa">Villa</option>
-              </select>
+          <div className="space-y-4">
+            <select value={type} onChange={(e) => setType(e.target.value)} className="w-full p-3 border rounded-xl text-black">
+              <option value="">Select property type</option>
+              <option value="Apartment">Apartment</option>
+              <option value="Villa">Villa</option>
+            </select>
+
+            <input type="number" placeholder="Area in sq ft" value={area} onChange={(e) => setArea(e.target.value)} className="w-full p-3 border rounded-xl text-black" />
+
+            <select value={location} onChange={(e) => setLocation(e.target.value)} className="w-full p-3 border rounded-xl text-black">
+              <option value="">Select city</option>
+              {uniqueCities.map((city) => <option key={city}>{city}</option>)}
+            </select>
+
+            <div className="flex flex-wrap gap-2 text-black">
+              {['Parking', 'Pool', 'Gym', 'Security'].map((amenity) => (
+                <label key={amenity} className="flex items-center gap-1 border p-2 rounded-xl">
+                  <input type="checkbox" value={amenity} onChange={handleAmenityChange} />
+                  {amenity}
+                </label>
+              ))}
             </div>
 
-            <div>
-              <label className="block font-semibold text-gray-800 mb-1">Area (sq ft)</label>
-              <input
-                className="w-full border border-gray-300 p-3 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500"
-                type="number"
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-                placeholder="Enter area (e.g. 2500)"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-gray-800 mb-1">Location (City)</label>
-              <select
-                className="w-full border border-gray-300 p-3 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-blue-500"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              >
-                <option value="">Select city</option>
-                {uniqueCities.map((city) => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-semibold text-gray-800 mb-2">Select Amenities</label>
-              <div className="flex flex-wrap gap-4">
-                {['Parking', 'Pool', 'Gym', 'Security'].map((amenity) => (
-                  <label key={amenity} className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-xl shadow-sm border border-gray-200">
-                    <input type="checkbox" value={amenity} onChange={handleAmenityChange} />
-                    <span className="text-sm text-gray-700 font-medium">{amenity}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={handleCalculate}
-              className="w-full bg-gradient-to-r from-blue-700 to-blue-900 text-white p-3 rounded-xl text-lg font-semibold hover:opacity-90 transition"
-            >
-              Calculate Price
-            </button>
-
-            {price !== null && user && (
-              <button
-                onClick={saveProperty}
-                className="w-full mt-3 bg-emerald-600 text-white p-3 rounded-xl text-lg font-semibold hover:bg-emerald-700 transition"
-              >
-                Save Property
-              </button>
-            )}
+            <button onClick={handleCalculate} className="w-full bg-blue-700 text-white p-3 rounded-xl">Calculate Price</button>
+            {price !== null && user && <button onClick={saveProperty} className="w-full mt-2 bg-emerald-600 text-white p-3 rounded-xl">Save Property</button>}
           </div>
 
-          <div className="flex flex-col items-center justify-center">
-            <img
-              src="https://www.happy.rentals/admin/uploads/634fc6f79ad5eFamily-friendly-holiday-home.jpg"
-              alt="Family with Home"
-              className="rounded-2xl shadow-lg max-h-64 object-cover"
-            />
+          <div className="hidden md:block">
+            <img src="https://www.happy.rentals/admin/uploads/634fc6f79ad5eFamily-friendly-holiday-home.jpg" alt="House" className="rounded-xl shadow-md" />
           </div>
         </div>
 
         {price !== null && (
-          <div className="mt-10 bg-emerald-50 text-emerald-900 p-6 rounded-2xl shadow-inner border border-emerald-200 text-center">
-            <h3 className="text-2xl font-bold mb-2">Estimated Price</h3>
-            <p className="text-4xl font-extrabold">₹{price.toLocaleString()}</p>
-            <p className="mt-1 text-sm text-gray-600">Based on area, location and amenities</p>
+          <div className="mt-8 p-6 bg-emerald-50 border border-emerald-200 text-center rounded-xl">
+            <h2 className="text-2xl text-black font-bold">Estimated Price</h2>
+            <p className="text-4xl text-black font-extrabold">₹{price.toLocaleString()}</p>
+          </div>
+        )}
+
+        {user && savedResults.length > 0 && (
+          <div className="mt-10">
+            <h3 className="text-xl text-black font-semibold mb-4">Previously Searched Properties</h3>
+            <ul className="grid gap-4">
+              {savedResults.map((res) => (
+                <li key={res._id} className="p-4 border rounded-xl bg-gray-50 flex justify-between items-center">
+                  <div>
+                    <div className="flex justify-between">
+                      <span className="font-semibold">{res.type}</span>
+                      <span className="text-sm">₹{res.price.toLocaleString()}</span>
+                    </div>
+                    <p className="text-sm text-gray-600">{res.area} sqft in {res.location} ({res.amenities.join(', ')})</p>
+                  </div>
+                  <button
+                    onClick={() => deleteProperty(res._id)}
+                    className="text-red-500 hover:text-red-700 font-semibold"
+                    title="Delete"
+                  >
+                    ✖
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

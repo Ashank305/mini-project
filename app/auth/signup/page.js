@@ -11,6 +11,11 @@ export default function SignupPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
     try {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
@@ -23,7 +28,6 @@ export default function SignupPage() {
       if (!res.ok) {
         setError(data.error || 'Signup failed');
       } else {
-        // Save user session
         localStorage.setItem('loggedInUser', JSON.stringify({ name: formData.name, email: formData.email }));
         router.push('/');
       }
@@ -58,7 +62,7 @@ export default function SignupPage() {
 
         <input
           type="password"
-          placeholder="Password"
+          placeholder="Password (min 6 characters)"
           value={formData.password}
           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
           required
@@ -75,14 +79,14 @@ export default function SignupPage() {
         </button>
 
         <p className="mt-4 text-center text-sm text-gray-600">
-  Already have an account?{' '}
-  <span
-    onClick={() => router.push('/auth/login')}
-    className="text-blue-700 font-medium cursor-pointer hover:underline"
-  >
-    Log In
-  </span>
-</p>
+          Already have an account?{' '}
+          <span
+            onClick={() => router.push('/auth/login')}
+            className="text-blue-700 font-medium cursor-pointer hover:underline"
+          >
+            Log In
+          </span>
+        </p>
       </form>
     </main>
   );

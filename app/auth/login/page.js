@@ -25,7 +25,7 @@ export default function LoginPage() {
         setError(data.error || 'Login failed');
 
         if (data.requireOtp) {
-          setShowOtpFields(true); // Show OTP + new password fields
+          setShowOtpFields(true);
         }
       } else {
         localStorage.setItem('loggedInUser', JSON.stringify({ name: data.name, email: formData.email }));
